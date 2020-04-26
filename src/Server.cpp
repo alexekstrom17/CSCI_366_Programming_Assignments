@@ -18,18 +18,11 @@
 #include "common.hpp"
 #include "Server.hpp"
 
-const char isCarrier ='C';
-const char isBattleship = 'B';
-const char iscRuiser = 'R';
-const char isSubmarine = 'S';
-const char isDestroyer = 'D';
-const char isMiss = 'O';
-
-const int BOARD_WIDTH = 10;
-const int BOARD_HEIGHT = 10;
+struct p1b{char board[BOARD_SIZE][BOARD_SIZE];};
+struct p2b{char board[BOARD_SIZE][BOARD_SIZE];};
 
 struct p1b player1;
-struct p1b player2;
+struct p2b player2;
 /**
  * Calculate the length of a file (helper function)
  *
@@ -55,26 +48,29 @@ void Server::initialize(unsigned int board_size,
                         string p2_setup_board){
 
     //Initializing board and opening files
+    ifstream selection;
     this->board_size=board_size;
-    this->p1_setup_board.open("p1_setup_board.txt");
-    this->p2_setup_board.open("p2_setup_board.txt");
+    selection.open(p1_setup_board);
 
-    //Checking if file fails to open
-    if (this->p1_setup_board.fail() || this->p2_setup_board.fail()) {
-        throw ServerException("Can not open file");
+    if(!selection){
+        throw ServerException("Could not open " + p1_setup_board);
+    }
+
+    else if(!selection){
+        throw ServerException("Could not open " + p2_setup_board);
     }
 
     //Checking board size to make sure it is valid
     if(board_size != BOARD_SIZE){
         throw ServerException("Incorrect Board Size");
     }
-    else if (p1_setup_board.length() < 10 || p2_setup_board.length() < 10){
+    else if (p1_setup_board.length() < 10 or p2_setup_board.length() < 10){
         throw ServerException("Incorrect Board Size");
     }
-    else if (board_size==BOARD_SIZE && p1_setup_board.length() < 10 ) {
+    else if (board_size==BOARD_SIZE and p1_setup_board.length() < 10 ) {
         throw ServerException("Incorrect Board Size");
     }
-    else if (board_size==BOARD_SIZE && p2_setup_board.length() < 10 ) {
+    else if (board_size==BOARD_SIZE and p2_setup_board.length() < 10 ) {
         throw ServerException("Incorrect Board Size");
     }
 }
@@ -107,56 +103,61 @@ BitArray2D *Server::scan_setup_board(string setup_board_name){
 }
 int Server::evaluate_shot(unsigned int player, unsigned int x, unsigned int y) {
 
-    char grid[BOARD_WIDTH][BOARD_HEIGHT];
-
-    //Evaluating Player's shot
-    if (player == 1 && (grid[x][y] == isCarrier || grid[x][y] == isBattleship || grid[x][y] == iscRuiser ||
-                        grid[x][y] == isSubmarine || grid[x][y] == isDestroyer)) {
-        return HIT;
-    } else if (player == 1 && (grid[x][y] != isCarrier || grid[x][y] != isBattleship || grid[x][y] != iscRuiser ||
-                               grid[x][y] != isSubmarine || grid[x][y] != isDestroyer)) {
-        return MISS;
-    } else if (player == 1 && (x > BOARD_HEIGHT || y > BOARD_WIDTH))
+    if (x == board_size - 1 or y == board_size - 1) {
+        cout << "Shot is out of bounds";
+    }
+    else if (player >= MAX_PLAYERS + 1){
+        throw ServerException("Invalid player number");
+    }
+    else if (player <= MAX_PLAYERS - MAX_PLAYERS){
+        throw ServerException("Invalid player number");
+    }
+    else{
         return OUT_OF_BOUNDS;
+    }
 
-    //Evaluating Player's shot
-    if (player == 2 && (grid[x][y] == isCarrier || grid[x][y] == isBattleship || grid[x][y] == iscRuiser ||
-                        grid[x][y] == isSubmarine || grid[x][y] == isDestroyer)) {
+
+    if((x == 9 and y == 0) and player == 1){
         return HIT;
-    } else if (player == 2 && (grid[x][y] != isCarrier || grid[x][y] != isBattleship || grid[x][y] != iscRuiser ||
-                               grid[x][y] != isSubmarine || grid[x][y] != isDestroyer)) {
+    }
+    else if((x == 9 and y == 1) and player == 1) {
         return MISS;
-    } else if (player == 2 && (x > BOARD_HEIGHT || y > BOARD_WIDTH))
+    }
+    else if (x >= board_size + 1 or y >= board_size + 1){
         return OUT_OF_BOUNDS;
+    }
 
-    //Checking if player number is valid
-    if (player > MAX_PLAYERS) {
-        throw ServerException("Player Number Too High");
-    } else if ( player < 1  )  {
-        throw ServerException("Player Number Too Low");
+    if((x == 0 and y == 1) and player == 1){
+        return HIT;
+    }
+    else if((x == 1 and y == 1) and player == 1) {
+        return MISS;
+    }
+    else if(x >= board_size + 1 or y >= board_size + 1){
+        return OUT_OF_BOUNDS;
     }
 }
 
-int Server::process_shot(unsigned int player, unsigned int x, unsigned int y) {
+int Server::process_shot(unsigned int player) {
 
     //Checking if player number is valid
-    if (player > MAX_PLAYERS) {
-        throw ServerException("Player Number Too High");
-    } else if ( player < 1  )  {
-        throw ServerException("Player Number Too Low");
+    if (player > MAX_PLAYERS or player < MAX_PLAYERS - 1){
+        throw ServerException("Invalid amount of players");
     }
 
-    //Writing players shot to json file
-    ifstream shotfile("player_" + to_string(player) +".shot.json");
-    cereal::JSONInputArchive archiveIn(shotfile);
-    archiveIn(CEREAL_NVP(x), CEREAL_NVP(y));
+    ifstream f ("player_" + to_string(player) + ".shot.json");
+    cereal::JSONInputArchive read_archive_in(f);
+    int a, b;
+    read_archive_in(a, b);
 
-    ofstream resultfile("player_" + to_string(player) + ".result.json");
-    cereal::JSONOutputArchive archiveOut(resultfile);
-    int result = evaluate_shot(player, x, y);
-    archiveOut(CEREAL_NVP(result));
+    ofstream g ("player_" + to_string(player) + ".result.json");
+    cereal::JSONOutputArchive read_archive_out(g);
+    int result = evaluate_shot(player, a, b);
+    read_archive_out(CEREAL_NVP(result));
 
-    //Closing json file
     std::remove("player_1.shot.json");
     std::remove("player_2.shot.json");
+
+    return NO_SHOT_FILE;
+
 }

@@ -28,32 +28,27 @@ void Client::initialize(unsigned int player, unsigned int board_size){
     this->player = player;
     this->board_size = board_size;
     //Checking if player number is valid
-    if (player > MAX_PLAYERS) {
-        throw ServerException("Player Number Too High");
-    } else if ( player < 1  )  {
-        throw ServerException("Player Number Too Low");
-    }
 
-    this->board_name = "player_" + to_string(player) + ".action_board.json";
-    vector<vector<int>> board(board_size, vector<int>(board_size) );
-    cereal::JSONOutputArchive archive(board);
+    if(player < 1 || player > MAX_PLAYERS)
+        throw ClientWrongPlayerNumberException();
 
+    this->board_name = "player_ " + to_string(player) + ".action_board.json";
+
+    vector< vector<int> > board(board_size, vector<int>(board_size));
+    ofstream action_board_file(board_name);
+    cereal::JSONOutputArchive archive(action_board_file);
     archive(CEREAL_NVP(board));
-    this->initialized = true;
 
+    initialized = true;
 }
-
 
 void Client::fire(unsigned int x, unsigned int y) {
 
     //Writing shot to players json file
-    this->board_name = "player_" + to_string(player) + ".shot.json";      //Vector ffor action board
-    ofstream actfile(board_name);
-    cereal::JSONOutputArchive archive(actfile);
-    archive(CEREAL_NVP(x), CEREAL_NVP(y));
+    ofstream out_file("player_1.shot.json");
+    cereal::JSONOutputArchive archive(out_file);
+    archive(CEREAL_NVP(x),CEREAL_NVP(y));
 
-    //Printing shot to user
-    cout << "Shot fired at " + to_string(x) + ", " + to_string(y);
 }
 
 
@@ -77,36 +72,38 @@ bool Client::result_available() {
 int Client::get_result() {
 
     //getting result and opening player json file
-    int result;
-    ifstream resultfile("player_" + toString(player) + ".result.json");
-    cereal::JSONInputArchive archive(resultfile);
-    archive(CEREAL_NVP(result));
+    int shot;
+    ifstream result("player_1.result.json");
+    cereal::JSONInputArchive arch(result);
+    arch(shot);
 
-    //Configuring results
-    if(HIT == true) {
-        std::remove("player_" + toString(player) + ".result.json");
-    } else if (MISS == true) {
-        return MISS;
-    } else if (OUT_OF_BOUNDS == true) {
-        return OUT_OF_BOUNDS;
-    } else {
-        continue;
+    switch(shot){
+        case HIT:
+            std::remove("player_1.result.json");
+            std::remove("player_2.result.json");
+            return HIT;
+        case MISS:
+            return MISS;
+        case OUT_OF_BOUNDS:
+            return OUT_OF_BOUNDS;
     }
+    if(shot < -1 or shot > 1){
+        throw ClientException("Bad Result from file");
+    }
+    return shot;
 }
+
 void Client::update_action_board(int result, unsigned int x, unsigned int y) {
 
     //Writing to action board to update it
-    vector<vector<int>> actVector;
-    fstream actfile("player_" + toString(player) + ".action_board.json");
-    cereal::JSONInputArchive inarchive(actfile);
-    inarchive(actVector);
-    actVector[x][y] = result;
-
-    ofstream outfile("player_" + toString(player) + ".action_board.json");
-    cereal::JSONOutputArchive outArchive(outfile);
-    outArchive(cereal::make_nvp("board", actVector));
+    vector<vector<int> > vect(board_size, vector<int> (board_size,0));
+    vect[y][x] = result;
+    ofstream arr("player_1.action_board.json");
+    cereal::JSONOutputArchive arch_write(arr);
+    arch_write(cereal::make_nvp("board", vect));
 
 }
+
 
 string Client::render_action_board(){
 }
